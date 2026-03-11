@@ -10,7 +10,7 @@ namespace UnitySkills
 {
     /// <summary>
     /// UI Toolkit skills - create/edit USS/UXML files and configure UIDocument in scenes.
-    /// Requires Unity 2021.3+ (UI Toolkit runtime support).
+    /// Requires Unity 2022.3+ (package minimum supported version).
     /// </summary>
     public static class UIToolkitSkills
     {
@@ -283,7 +283,7 @@ namespace UnitySkills
             int referenceResolutionY = 1080,
             string screenMatchMode = "MatchWidthOrHeight",
             string themeStyleSheetPath = null,
-            // General properties (Unity 2021.3+)
+            // General properties (Unity 2022.3+)
             string textSettingsPath = null,
             string targetTexturePath = null,
             int? targetDisplay = null,

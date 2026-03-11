@@ -7,7 +7,7 @@ description: "UI Toolkit (UITK) for Unity — create/edit USS stylesheets and UX
 
 Work with Unity's web-style UI system: **UXML** (structure, like HTML) + **USS** (styling, like CSS) + **UIDocument** (scene display).
 
-> **Requires Unity 2021.3+**. This module is separate from `ui_*` skills (uGUI/Canvas). Use `uitk_*` for UI Toolkit only.
+> **Requires Unity 2022.3+**. This module is separate from `ui_*` skills (uGUI/Canvas). Use `uitk_*` for UI Toolkit only.
 
 > **Localization**: Match UI text language to the user's conversation language. When the user communicates in **Chinese (中文)**, use Chinese for all UXML text attributes — labels, buttons, titles, descriptions, tags, placeholders. Otherwise default to **English**. USS class names and CSS variables always stay in English.
 
@@ -682,7 +682,7 @@ Create a `PanelSettings` ScriptableObject asset with full property support.
 | `screenMatchMode` | string | No | `"MatchWidthOrHeight"` | `MatchWidthOrHeight`, `Shrink`, `Expand` |
 | `themeStyleSheetPath` | string | No | null | ThemeStyleSheet asset path |
 
-**General Properties (Unity 2021.3+):**
+**General Properties (Unity 2022.3+):**
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|

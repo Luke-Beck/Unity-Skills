@@ -4,8 +4,11 @@
 
 | Version | Supported |
 |---------|-----------|
-| 1.5.x   | ✅ |
+| 1.6.x   | ✅ |
+| 1.5.x   | Best effort |
 | < 1.5   | ❌ |
+
+当前安全修复与回归验证优先覆盖 **Unity 2022.3+ / Unity 6** 环境。旧版 Unity 兼容逻辑可能仍存在，但不承诺持续适配。
 
 ## Reporting a Vulnerability | 报告漏洞
 

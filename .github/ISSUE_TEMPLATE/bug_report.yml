@@ -6,6 +6,7 @@ body:
     id: unity-version
     attributes:
       label: Unity 版本
+      description: 当前官方维护基线为 Unity 2022.3+ / Unity 6；若问题发生在更早版本，请明确说明。
       placeholder: "例如: 2022.3.20f1"
     validations:
       required: true

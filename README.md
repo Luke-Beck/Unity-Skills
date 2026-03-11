@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Unity-2021.3%2B-black?style=for-the-badge&logo=unity" alt="Unity">
+  <img src="https://img.shields.io/badge/Unity-2022.3%2B-black?style=for-the-badge&logo=unity" alt="Unity">
   <img src="https://img.shields.io/badge/Skills-446-green?style=for-the-badge" alt="Skills">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-orange?style=for-the-badge" alt="License"></a>
   <a href="README_EN.md"><img src="https://img.shields.io/badge/README-English-blue?style=for-the-badge" alt="English"></a>
@@ -20,6 +20,8 @@
   🎉 我们已被 <b>DeepWiki</b> 收录！<br>
   有问题？查阅 AI 生成的项目文档 → <a href="https://deepwiki.com/Besty0728/Unity-Skills"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 </p>
+
+> 当前官方维护基线为 **Unity 2022.3+**。仓库中仍可能保留部分对 Unity 2021 的兼容逻辑，但后续功能开发、回归验证与适配工作将以 **2022.3+ / Unity 6** 为主。
 
 ## 🤝 致谢
 本项目基于 [unity-mcp](https://github.com/CoplayDev/unity-mcp) 的优秀理念深度重构与功能扩展。

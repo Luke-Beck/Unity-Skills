@@ -16,7 +16,6 @@ import unity_skills
 unity_skills.set_unity_version("6")      # Unity 6 (matches 6000.x.x)
 unity_skills.set_unity_version("2023")   # Unity 2023.x
 unity_skills.set_unity_version("2022")   # Unity 2022.x
-unity_skills.set_unity_version("2021")   # Unity 2021.x
 ```
 
 | User says | Call |
@@ -24,7 +23,6 @@ unity_skills.set_unity_version("2021")   # Unity 2021.x
 | "Unity 6" / "Unity6" / "Unity 6.2" | `set_unity_version("6")` |
 | "2023" / "Unity 2023" | `set_unity_version("2023")` |
 | "2022" / "Unity 2022" | `set_unity_version("2022")` |
-| "2021" / "Unity 2021" | `set_unity_version("2021")` |
 
 `list_instances()` �?returns all running instances with `unityVersion`, `port`, `name`
 

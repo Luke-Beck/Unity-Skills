@@ -7,11 +7,12 @@ Control Unity Editor directly via REST API — let AI-generated scripts handle s
 
 ## 🔧 前置要求 / Prerequisites
 
-- **Unity 版本 / Version**: 2021.3 或更高（推荐 Unity 6）/ 2021.3+ (Unity 6 recommended)
+- **Unity 版本 / Version**: 2022.3 或更高（推荐 Unity 6）/ 2022.3+ (Unity 6 recommended)
 - **依赖包 / Dependencies**:
     - `com.unity.cinemachine`: 3.1.3+ (核心依赖 / Core dependency)
     - `com.unity.splines`: 2.8.0+ (v1.4.1 新增硬依赖 / Hard dependency since v1.4.1)
 - **注意 / Note**: 安装插件时会自动拉取上述依赖，无需手动安装。Dependencies are auto-installed with the plugin.
+- **维护说明 / Maintenance Note**: 当前官方适配与测试重点为 Unity 2022.3+ 与 Unity 6。仓库中可能仍保留部分旧版本兼容逻辑，但不再作为后续适配主目标。Official adaptation and testing now focus on Unity 2022.3+ and Unity 6. Some legacy compatibility logic may remain, but it is no longer the primary forward-compatibility target.
 
 ---
 

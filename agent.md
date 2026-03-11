@@ -11,7 +11,7 @@
 | **项目名称** | UnitySkills |
 | **版本** | 1.6.1 |
 | **技术栈** | C# (Unity Editor) + Python (Client) |
-| **Unity 版本** | 2021.3+ (已验证 Unity 6 / 6000.2.x) |
+| **Unity 版本** | 2022.3+（官方维护基线，已验证 Unity 6 / 6000.2.x） |
 | **协议** | MIT |
 | **核心功能** | 通过 REST API 让 AI 直接控制 Unity 编辑器 |
 
@@ -463,22 +463,24 @@ public static class MyCustomSkills
 
 ## 📌 版本号更新规范
 
-> ⚠️ **重要规则**：每次发布新版本时，必须同步更新以下 **6 处** 版本号：
+> ⚠️ **重要规则**：当前版本号维护采用“统一常量 + 派生位点”模式。每次发布新版本时，必须同步检查以下 **8 处**：
 
 | 序号 | 文件路径 | 位置 |
 |:----:|----------|------|
-| 1 | `agent.md` | 第 12 行 `\| **版本** \|` 表格 |
-| 2 | `package.json` | 第 3 行 `"version": "x.x.x"` |
-| 3 | `CHANGELOG.md` | 顶部新增 `## [x.x.x] - YYYY-MM-DD` 条目 |
-| 4 | `SkillsHttpServer.cs` | `version = "x.x.x"` (health endpoint) |
-| 5 | `SkillRouter.cs` | `version = "x.x.x"` (manifest) |
-| 6 | `README.md` *(可选)* | 模块表中的 `[vX.X]` 标签 |
+| 1 | `SkillsForUnity/Editor/Skills/SkillsLogger.cs` | `public const string Version = "x.x.x"`，这是 C# 端统一版本源 |
+| 2 | `agent.md` | 第 12 行 `\| **版本** \|` 表格 |
+| 3 | `SkillsForUnity/package.json` | 第 3 行 `"version": "x.x.x"` |
+| 4 | `CHANGELOG.md` | 顶部新增 `## [x.x.x] - YYYY-MM-DD` 条目 |
+| 5 | `unity-skills/scripts/unity_skills.py` | `__version__ = "x.x.x"` |
+| 6 | `README.md` | Git URL 示例中的 `#vX.X.X`、必要时正文版本说明 |
+| 7 | `README_EN.md` | Git URL 示例中的 `#vX.X.X`、必要时正文版本说明 |
+| 8 | `SkillsHttpServer.cs` / `SkillRouter.cs` | 两者应继续使用 `SkillsLogger.Version`，不要再写死字面量 |
 
 ### 快速检查命令
 
 ```bash
-# 检查所有版本号是否一致
-grep -rn "1.6.1" --include="*.cs" --include="*.json" --include="*.md" | grep -E "version|版本"
+# 检查统一版本源与主要文档是否一致
+rg -n "1.6.1|SkillsLogger.Version|__version__" agent.md CHANGELOG.md README.md README_EN.md SkillsForUnity/package.json unity-skills/scripts/unity_skills.py SkillsForUnity/Editor/Skills/SkillsLogger.cs SkillsForUnity/Editor/Skills/SkillsHttpServer.cs SkillsForUnity/Editor/Skills/SkillRouter.cs
 ```
 
 ---
