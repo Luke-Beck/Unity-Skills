@@ -23,10 +23,10 @@ namespace UnitySkills
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
-            // 浣跨敤 SaveAsPrefabAssetAndConnect 灏嗗満鏅墿浣撹繛鎺ヤ负棰勫埗浣撳疄渚?
+            // 使用 SaveAsPrefabAssetAndConnect 将场景物体连接为预制体实例
             var prefab = PrefabUtility.SaveAsPrefabAssetAndConnect(go, savePath, InteractionMode.UserAction);
 
-            // 璁板綍鏂板垱寤虹殑棰勫埗浣撹祫浜?
+            // 记录新创建的预制体资产
             WorkflowManager.SnapshotCreatedAsset(prefab);
 
             return new { success = true, prefabPath = savePath, name = prefab.name };
