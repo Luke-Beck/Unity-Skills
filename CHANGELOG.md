@@ -2,7 +2,7 @@
 
 All notable changes to **UnitySkills** will be documented in this file.
 
-## [1.6.2] - 2026-03-12
+## [1.6.2] - 2026-03-13
 
 ### Added
 - **13 个 advisory 设计模块**：在 `unity-skills/skills/` 下新增架构、脚本职责、异步策略、ADR、Inspector 设计、性能审视、可测试性等建议型模块，用于辅助 AI 在真正写脚本前先做设计判断。
@@ -67,6 +67,15 @@ All notable changes to **UnitySkills** will be documented in this file.
 - **ScriptableObjectSkills 类型查找**：`FindScriptableObjectType` 改用 `OrdinalIgnoreCase` 大小写不敏感匹配。
 - **CleanerSkills 路径格式**：`cleaner_find_large_assets` 将绝对 OS 路径转换为 Unity 相对路径。
 - **Python 线程安全**：`_auto_workflow_enabled` 和 `_current_workflow_active` 全局标志添加 `threading.Lock` 保护。
+
+### Server Resilience (Domain Reload 韧性强化)
+- **Domain Reload 重启意图丢失修复**：3 次重试全部失败后 `OnBeforeAssemblyReload` 将 `PREF_SERVER_SHOULD_RUN` 覆写为 `false` 导致服务器永久死亡。修复为：仅在 `_isRunning=true` 时写入 true、`Start()` 失败时不清除重启意图，保留跨 Reload 的恢复机会。
+- **跨 Reload 连续失败追踪**：新增 `PREF_CONSECUTIVE_FAILURES` 持久化计数器，每轮重试（3 次 + 指数退避）全部失败时 +1，累计达到 5 次后放弃自动重启并输出明确日志提示用户手动启动，防止无限重试循环。成功启动或用户显式停止/退出编辑器时清零。
+- **Watchdog Keep-Alive 线程监控**：Watchdog 在 listener 线程健康时额外检测 Keep-Alive 线程存活状态，死亡则自动重启新线程，避免 Unity 失焦后静默失去后台唤醒能力。
+- **504 超时响应增强**：新增 `diagnostics` 对象（domainReloadPending / queuedRequests / listenerAlive / keepAliveAlive）、`manualAction` 操作指引、动态 `retryAfterSeconds`（Reload 期间 5s，否则 10s），帮助 AI Agent 自主判断重试策略。
+- **503 编译中响应增强**：新增 `diagnostics` 对象（isCompiling / isUpdating / domainReloadPending）、`manualAction` 操作指引、动态 `retryAfterSeconds`（Reload 期间 8s，否则 5s）。
+- **`/health` 端点结构化诊断**：新增 `threads`（listenerAlive / keepAliveAlive）、`compilation`（isCompiling / isUpdating / domainReloadPending）、`queueStats`（queued / totalReceived）三组诊断字段，所有旧字段保持向后兼容。
+- **SkillRouter 集中注入 `serverAvailability`**：新增 `SerializeSuccessResponse()` 辅助方法，编译进行中时自动向所有 Skill 的成功响应注入 `serverAvailability` 提示（已有该字段的响应不重复注入），无需每个 Skill 单独处理。
 
 ### Enhanced
 - **新增 `script_dependency_graph` Skill**：给定入口脚本，BFS 双向扩展 N 跳依赖闭包，返回结构化 JSON（脚本列表含 fields/unityCallbacks、边列表、Kahn 拓扑排序的 suggestedReadOrder），帮助 AI 仅加载必要脚本上下文而非全量源码。（REST Skills 447 → 448）

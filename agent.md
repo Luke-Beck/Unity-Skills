@@ -78,13 +78,21 @@
     - 启动后自动 Self-Test：通过 `EditorApplication.delayCall` + `ThreadPool` 异步请求两个地址的 `/health` 端点，结果输出到 Console，帮助用户快速定位连接问题。
     - `SceneScreenshot` 自动补全文件扩展名：当 `filename` 参数不含扩展名时自动追加 `.png`，确保截图文件可被 Unity 正常识别和预览。
 
+7.  **Domain Reload 韧性增强** [v1.6.2]:
+    - **重启意图保留**：`OnBeforeAssemblyReload` 仅在服务器正在运行时写入 `PREF_SERVER_SHOULD_RUN=true`，避免失败状态覆盖重启意图导致服务器永久死亡。
+    - **跨 Reload 连续失败追踪**：通过 `PREF_CONSECUTIVE_FAILURES` 计数器追踪连续失败次数，达到 5 次上限后放弃自动重启并提示用户手动操作。
+    - **Watchdog Keep-Alive 监控**：Watchdog 除监控 Listener 线程外，新增 Keep-Alive 线程存活检测，发现死亡后自动重启。
+    - **增强错误响应**：504 超时和 503 编译中响应包含 `diagnostics`（线程状态/队列深度/Domain Reload 状态）、`suggestion`、`manualAction`、`retryAfterSeconds`。
+    - **`/health` 结构化诊断**：新增 `threads`（listener/keepAlive 存活状态）、`compilation`（isCompiling/isUpdating/domainReloadPending）、`queueStats`（排队数/总请求数）字段。
+    - **SkillRouter 集中注入 `serverAvailability`**：编译进行中时，`SerializeSuccessResponse()` 自动向 Skill 返回结果注入 `serverAvailability` 提示，告知客户端服务器即将短暂不可达。
+
 **Producer-Consumer 模式** (线程安全)：
 - **Producer** (HTTP 线程)：接收 HTTP 请求，入队到 `RequestJob` 队列
 - **Consumer** (Unity 主线程)：通过 `EditorApplication.update` 处理队列中的任务
-- **自动恢复**：Domain Reload 后自动重启服务器（端口持久化 + 秒级延迟重试 + 端口 fallback）
+- **自动恢复**：Domain Reload 后自动重启服务器（端口持久化 + 秒级延迟重试 + 端口 fallback + 连续失败追踪）
 - **超时可配置**：请求超时默认 15 分钟，用户可在设置面板自定义，Python 客户端自动同步
 - **超时值线程安全缓存**：`RequestTimeoutMs` 在 `Start()` 时缓存到静态字段，避免 ThreadPool 线程调用 `EditorPrefs`（主线程限定 API）导致 500 错误
-- **编译期短暂不可达属于预期**：脚本保存、强制重编译、Define 变更、资源重导入、包安装/移除等操作可能触发编译或 Domain Reload；此时 REST 服务短暂不可达是正常现象，客户端应等待后重试
+- **编译期短暂不可达属于预期**：脚本保存、强制重编译、Define 变更、资源重导入、包安装/移除等操作可能触发编译或 Domain Reload；此时 REST 服务短暂不可达是正常现象，客户端应等待后重试。错误响应（504/503）包含结构化诊断信息和重试建议
 
 ---
 
@@ -171,11 +179,14 @@ HTTP 服务器核心，采用 **Producer-Consumer** 架构保证线程安全：
 ```csharp
 // 关键特性
 - 端口: localhost:8090
-- 自动恢复: Domain Reload 后通过 EditorPrefs 恢复状态
+- 自动恢复: Domain Reload 后通过 EditorPrefs 恢复状态，跨 Reload 连续失败追踪（5 次上限）
 - Keep-Alive: 后台线程定时触发 Unity 更新，确保后台运行
+- Watchdog: 监控 Listener + Keep-Alive 线程存活，自动重启死亡线程
 - 速率限制: 内置防止过快请求的保护机制
 - 请求超时: 用户可配置（默认 15 分钟），通过 /health 端点暴露给客户端自动同步
-- Domain Reload 韧性: 主动释放端口 + 端口持久化 + 秒级延迟重试 + 端口 fallback
+- Domain Reload 韧性: 主动释放端口 + 端口持久化 + 秒级延迟重试 + 端口 fallback + 意图保留
+- /health 诊断: 返回 threads/compilation/queueStats 结构化状态，客户端可用于智能重试
+- 错误响应增强: 504/503 包含 diagnostics + suggestion + manualAction + retryAfterSeconds
 ```
 
 ### 2. SkillRouter.cs
@@ -187,6 +198,7 @@ HTTP 服务器核心，采用 **Producer-Consumer** 架构保证线程安全：
 Initialize()      // 扫描所有程序集，发现 [UnitySkill] 方法
 GetManifest()     // 返回所有 Skills 的 JSON 清单
 Execute(name, json) // 执行指定 Skill
+SerializeSuccessResponse(result) // 集中序列化，编译中自动注入 serverAvailability 提示
 ```
 
 ### 3. UnitySkillAttribute.cs
