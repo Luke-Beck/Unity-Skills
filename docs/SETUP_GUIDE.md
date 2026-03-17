@@ -1,121 +1,121 @@
-# UnitySkills 安装与排障指南
+# UnitySkills Setup and Troubleshooting Guide
 
-本文档面向本地开发环境，说明如何安装 UnitySkills、如何把 AI Skill 模板放到目标工具、以及在编译或 Domain Reload 期间应该如何处理短暂不可达。
+This document is intended for local development environments. It explains how to install UnitySkills, how to place the AI Skill template into the target tool, and how to handle temporary unavailability during compilation or Domain Reload.
 
-## 环境要求
+## Requirements
 
-- Unity：`2022.3+`
-- 推荐重点验证版本：`2022.3 LTS` 与 `Unity 6`
-- 网络环境：本地回环地址 `localhost` / `127.0.0.1`
-- 典型 AI 客户端：Claude Code、Codex、Gemini CLI、Antigravity、Cursor
+- Unity: `2022.3+`
+- Recommended primary validation versions: `2022.3 LTS` and `Unity 6`
+- Network environment: local loopback address `localhost` / `127.0.0.1`
+- Typical AI clients: Claude Code, Codex, Gemini CLI, Antigravity, Cursor
 
-## 安装 Unity 包
+## Install the Unity Package
 
-### Package Manager 安装
+### Install via Package Manager
 
-在 Unity 中打开：
+Open in Unity:
 
 ```text
 Window > Package Manager > + > Add package from git URL
 ```
 
-使用以下地址之一：
+Use one of the following URLs:
 
-稳定版：
+Stable:
 
 ```text
 https://github.com/Besty0728/Unity-Skills.git?path=/SkillsForUnity
 ```
 
-Beta：
+Beta:
 
 ```text
 https://github.com/Besty0728/Unity-Skills.git?path=/SkillsForUnity#beta
 ```
 
-指定版本：
+Specific version:
 
 ```text
 https://github.com/Besty0728/Unity-Skills.git?path=/SkillsForUnity#v1.6.4
 ```
 
-## 启动服务
+## Start the Service
 
-在 Unity 编辑器中打开：
+Open in the Unity Editor:
 
 ```text
 Window > UnitySkills > Start Server
 ```
 
-正常情况下，Console 会输出类似内容：
+Under normal circumstances, the Console will output something like:
 
 ```text
 [UnitySkills] REST Server started at http://localhost:8090/
 ```
 
-## 安装 AI Skill 模板
+## Install the AI Skill Template
 
-### 推荐：使用 Unity 内置安装器
+### Recommended: use the built-in Unity installer
 
-打开：
+Open:
 
 ```text
 Window > UnitySkills > Skill Installer
 ```
 
-选择目标 AI 工具后执行安装。安装器会复制包内的 `unity-skills~/` 模板目录到目标位置。
+Select the target AI tool and run the installation. The installer copies the `unity-skills~/` template directory from the package to the target location.
 
-目标目录应至少包含：
+The target directory should contain at least:
 
 - `SKILL.md`
 - `skills/`
 - `scripts/unity_skills.py`
 - `scripts/agent_config.json`
 
-### 手动安装
+### Manual installation
 
-如果不使用安装器，请把 UPM 包内的 `SkillsForUnity/unity-skills~/` 目录内容复制到你的 AI 工具技能目录中。
+If you do not use the installer, copy the contents of `SkillsForUnity/unity-skills~/` from the UPM package into your AI tool's skills directory.
 
-常见目录：
+Common directories:
 
-- Claude Code：`~/.claude/skills/`
-- Codex：`~/.codex/skills/`
-- Gemini CLI：`~/.gemini/skills/`
-- Antigravity：`~/.agent/skills/`
-- Cursor：`~/.cursor/skills/`
+- Claude Code: `~/.claude/skills/`
+- Codex: `~/.codex/skills/`
+- Gemini CLI: `~/.gemini/skills/`
+- Antigravity: `~/.agent/skills/`
+- Cursor: `~/.cursor/skills/`
 
-对于 Codex，推荐全局安装。项目级安装时，还需要在项目根目录的 `AGENTS.md` 中声明该技能。
+For Codex, global installation is recommended. For project-level installation, you also need to declare the skill in `AGENTS.md` at the project root.
 
-## Python 客户端行为
+## Python Client Behavior
 
-`unity_skills.py` 当前具备以下行为：
+`unity_skills.py` currently provides the following behavior:
 
-- 默认请求超时为 `900` 秒，也就是 `15 分钟`
-- 初始化时会从 `/health` 同步服务端超时设置
-- 复用 `requests.Session`，减少频繁新建连接
-- 遇到编译或 Domain Reload 导致的短暂断连时，会把错误标记为可重试
-- `WorkflowContext` 在超时或连接异常后，会尝试读取服务端状态并恢复工作流一致性
+- Default request timeout is `900` seconds, or `15 minutes`
+- During initialization, it syncs the server timeout setting from `/health`
+- Reuses `requests.Session` to reduce repeated connection creation
+- When compilation or Domain Reload causes a temporary disconnect, it marks the error as retryable
+- After a timeout or connection exception, `WorkflowContext` attempts to read the server state and restore workflow consistency
 
-## 编译、Domain Reload 与短暂不可达
+## Compilation, Domain Reload, and Temporary Unavailability
 
-以下操作都可能让服务短时间不可达：
+The following operations may make the service temporarily unavailable:
 
 - `script_create`
 - `script_append`
 - `script_replace`
 - `debug_force_recompile`
 - `debug_set_defines`
-- 某些 `asset_import` / `asset_reimport` / `asset_move`
-- 测试模板创建
-- 部分包安装或移除
+- Some `asset_import` / `asset_reimport` / `asset_move`
+- Test template creation
+- Some package installations or removals
 
-这是 Unity 编辑器行为，不是异常崩溃。建议做法：
+This is Unity Editor behavior, not an abnormal crash. Recommended practice:
 
-1. 收到“暂时不可用”或连接超时后，先等待几秒。
-2. 调用 `wait_for_unity()` 或使用 `call_skill_with_retry()`。
-3. 脚本生成后，优先读取编译反馈，再继续后续步骤。
+1. After receiving a “temporarily unavailable” message or connection timeout, wait a few seconds first.
+2. Call `wait_for_unity()` or use `call_skill_with_retry()`.
+3. After generating a script, read the compilation feedback first before proceeding to the next steps.
 
-脚本示例：
+Example script:
 
 ```python
 import unity_skills
@@ -125,9 +125,9 @@ if result.get("success"):
     print(result.get("compilation"))
 ```
 
-## 多实例路由
+## Multi-Instance Routing
 
-如果本机同时打开多个 Unity 项目，优先通过版本或目标名选择实例：
+If multiple Unity projects are open on the same machine, prefer selecting an instance by version or target name:
 
 ```python
 import unity_skills
@@ -136,7 +136,7 @@ unity_skills.set_unity_version("2022.3")
 unity_skills.call_skill("project_get_info")
 ```
 
-也可以通过注册表枚举实例：
+You can also enumerate instances through the registry:
 
 ```python
 import unity_skills
@@ -144,16 +144,16 @@ import unity_skills
 print(unity_skills.list_instances())
 ```
 
-## 批量优先原则
+## Batch-First Principle
 
-当你要操作 2 个及以上对象时，优先使用 `*_batch` 技能，原因是：
+When operating on 2 or more objects, prefer using `*_batch` skills because:
 
-- 请求数更少
-- 编译窗口更短
-- 工作流快照更集中
-- AI 更不容易在循环里打爆请求队列
+- Fewer requests
+- Shorter compilation windows
+- More concentrated workflow snapshots
+- AI is less likely to overwhelm the request queue inside a loop
 
-示例：
+Example:
 
 ```python
 unity_skills.call_skill(
@@ -165,27 +165,27 @@ unity_skills.call_skill(
 )
 ```
 
-## 测试模块说明
+## Test Module Notes
 
-- `test_run` 和 `test_run_by_name` 对接的是 Unity Test Runner。
-- 调用后立即返回 `jobId`。
-- 使用 `test_get_result(jobId)` 轮询结果。
-- 这不是启动独立的 Unity 可执行进程，而是在当前编辑器上下文里执行测试任务。
+- `test_run` and `test_run_by_name` integrate with Unity Test Runner.
+- They return a `jobId` immediately after invocation.
+- Use `test_get_result(jobId)` to poll for the result.
+- This does not launch a separate Unity executable process; it runs the test task inside the current editor context.
 
-## 常见排障
+## Common Troubleshooting
 
-| 问题 | 现象 | 建议 |
+| Problem | Symptom | Recommendation |
 | --- | --- | --- |
-| 连接失败 | `Cannot connect to http://localhost:8090` | 检查 Unity 是否已启动服务，或是否正处于编译 / Domain Reload |
-| 请求超时 | 超过 15 分钟后返回超时 | 先确认是否是长任务；必要时在 Unity 面板中调高超时设置 |
-| 技能列表为空 | `/skills` 返回异常 | 检查控制台是否有编译错误，确保插件成功导入 |
-| 脚本创建后断连 | 创建脚本后接口暂时不可用 | 正常现象，等待编译完成后重试 |
-| 多实例误连 | 请求打到了错误项目 | 先调用 `set_unity_version()` 或按目标名连接 |
-| 工作流状态异常 | 本地认为开始了任务，但服务端状态不一致 | 重新读取 `workflow_session_status`，当前客户端已内置恢复逻辑 |
+| Connection failed | `Cannot connect to http://localhost:8090` | Check whether Unity has started the service, or whether it is currently compiling / in Domain Reload |
+| Request timeout | Times out after more than 15 minutes | First confirm whether it is a long-running task; if necessary, increase the timeout setting in the Unity panel |
+| Skill list is empty | `/skills` returns an error | Check the Console for compilation errors and ensure the plugin imported successfully |
+| Disconnected after script creation | The API becomes temporarily unavailable after creating a script | This is normal; wait for compilation to finish and retry |
+| Wrong multi-instance connection | The request went to the wrong project | Call `set_unity_version()` first or connect by target name |
+| Abnormal workflow state | The local client thinks a task started, but the server state is inconsistent | Read `workflow_session_status` again; the current client already includes recovery logic |
 
-## 文档索引
+## Documentation Index
 
-- [中文 README](../README.md)
+- [README](../README.md)
 - [English README](../README_EN.md)
-- [AI Skill 入口](../SkillsForUnity/unity-skills~/SKILL.md)
-- [更新日志](../CHANGELOG.md)
+- [AI Skill entry point](../SkillsForUnity/unity-skills~/SKILL.md)
+- [Changelog](../CHANGELOG.md)

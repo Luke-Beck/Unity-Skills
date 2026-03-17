@@ -1,30 +1,30 @@
-﻿# UnitySkills Agent 文档
+# UnitySkills Agent Documentation
 
-> 本文档面向 AI Agent，提供项目全貌速览，帮助 AI 快速理解项目结构与开发规范。
+> This document is intended for AI agents. It provides a high-level overview of the project to help AI quickly understand the project structure and development conventions.
 
 ---
 
-## 📋 项目概览
+## 📋 Project Overview
 
-| 属性 | 值 |
+| Property | Value |
 |------|-----|
-| **项目名称** | UnitySkills |
-| **版本** | 1.6.4 |
-| **技术栈** | C# (Unity Editor) + Python (Client) |
-| **Unity 版本** | 2022.3+（官方维护基线，已验证 Unity 6 / 6000.2.x） |
+| **Project Name** | UnitySkills |
+| **Version** | 1.6.4 |
+| **Tech Stack** | C# (Unity Editor) + Python (Client) |
+| **Unity Version** | 2022.3+ (official maintenance baseline, verified on Unity 6 / 6000.2.x) |
 | **REST Skills** | 512 |
-| **Advisory 模块** | 14 |
-| **默认超时** | 15 分钟 |
-| **协议** | MIT |
-| **核心功能** | 通过 REST API 让 AI 直接控制 Unity 编辑器 |
+| **Advisory Modules** | 14 |
+| **Default Timeout** | 15 minutes |
+| **License** | MIT |
+| **Core Capability** | Let AI control the Unity Editor directly through the REST API |
 
 ---
 
-## 🏗️ 架构设计
+## 🏗️ Architecture Design
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    AI Agent (Claude / Antigravity / Gemini)  │
+│                    AI Agent (Claude / Antigravity / Gemini) │
 │                         Skill Consumer                       │
 └─────────────────────┬───────────────────────────────────────┘
                       │ HTTP REST API
@@ -37,335 +37,336 @@
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
 │             SkillsForUnity (Unity Editor Plugin)             │
-│  ┌─────────────────┐  ┌─────────────┐  ┌─────────────────┐  │
-│  │ SkillsHttpServer│→ │ SkillRouter │→ │[UnitySkill] 方法│  │
-│  │ (Multi-Instance)│  │(Auto-Undo)  │  │  (512 Skills)   │  │
-│  └─────────────────┘  └─────────────┘  └─────────────────┘  │
-│           ↓                  ↓                              │
-│  ┌─────────────────┐  ┌─────────────────────────────────┐   │
-│  │RegistryService  │  │ WorkflowManager (Persistent Undo)│  │
-│  │ (多实例发现)     │  │ (Task/Session/Snapshot 回滚)     │  │
-│  └─────────────────┘  └─────────────────────────────────┘   │
+│  ┌─────────────────┐  ┌─────────────┐  ┌───────────────────┐ │
+│  │ SkillsHttpServer│→ │ SkillRouter │→ │ [UnitySkill]      │ │
+│  │ (Multi-Instance)│  │(Auto-Undo)  │  │ methods (512)     │ │
+│  └─────────────────┘  └─────────────┘  └───────────────────┘ │
+│           ↓                  ↓                               │
+│  ┌─────────────────┐  ┌───────────────────────────────────┐  │
+│  │RegistryService  │  │ WorkflowManager (Persistent Undo) │  │
+│  │(Multi-instance  │  │ (Task/Session/Snapshot rollback)  │  │
+│  │ discovery)      │  │                                   │  │
+│  └─────────────────┘  └───────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 核心设计模式 & 新特性 (v1.4+)
+### Core Design Patterns & New Features (v1.4+)
 
-1.  **Multi-Instance (多实例支持)**:
-    - Server 自动寻找可用端口 `8090-8100`。
-    - 注册到全局 `~/.unity_skills/registry.json`，支持 AI 发现与连接。
+1.  **Multi-Instance**:
+    - The server automatically finds an available port in `8090-8100`.
+    - It registers itself in the global `~/.unity_skills/registry.json`, allowing AI to discover and connect to instances.
 
-2.  **Transactional Skills (原子化)**:
-    - 所有 Skill 自动包裹在 Unity Undo Group 中。
-    - 执行失败自动回滚 (Revert)，保证场景状态一致性。
+2.  **Transactional Skills**:
+    - Every skill is automatically wrapped in a Unity Undo Group.
+    - Failures trigger an automatic rollback (Revert), ensuring scene state consistency.
 
-3.  **Batch Operations (批处理)**:
-    - 提供 `_batch` 后缀的 API (如 `gameobject_create_batch`)，一次请求处理 1000+ 物体。
+3.  **Batch Operations**:
+    - Provides APIs with the `_batch` suffix (such as `gameobject_create_batch`) so a single request can process 1000+ objects.
 
 4.  **Token Optimization (Summary Mode)**:
-    - 大量数据返回时自动截断 (`verbose=false`)。
-    - `SKILL.md` 专为 AI 阅读优化。
+    - Large result sets are automatically truncated when `verbose=false`.
+    - `SKILL.md` is optimized specifically for AI consumption.
 
-5.  **Persistent Workflow (持久化回滚)** [v1.4]:
-    - `workflow_task_start/end`：创建可回滚的任务标签。
-    - `workflow_undo_task/redo_task`：任意任务回滚与重做。
-    - `workflow_session_*`：会话级（对话级）批量回滚。
-    - 历史记录跨 Editor 重启持久保存。
-    - **设计决策：Base64 资源备份不限制文件大小**。Unity 项目中纹理、模型等资源可能超过 10MB，为保证完整的撤销/重做能力，WorkflowManager 对所有非脚本资源进行无限制的 Base64 快照备份。这是有意为之的设计，不是安全漏洞。
+5.  **Persistent Workflow** [v1.4]:
+    - `workflow_task_start/end`: create rollback-capable task tags.
+    - `workflow_undo_task/redo_task`: roll back or redo any task.
+    - `workflow_session_*`: session-level (conversation-level) batch rollback.
+    - History persists across Editor restarts.
+    - **Design decision: Base64 asset backups have no file-size limit.** In Unity projects, textures, models, and other assets can exceed 10 MB. To guarantee complete undo/redo behavior, `WorkflowManager` stores unrestricted Base64 snapshot backups for all non-script assets. This is an intentional design choice, not a security vulnerability.
 
-6.  **IPv4/IPv6 双绑定 & 启动自检** [v1.5.1]:
-    - `HttpListener` 同时绑定 `http://localhost:{port}/` 和 `http://127.0.0.1:{port}/`，解决部分 Windows 系统 `localhost` 仅解析到 IPv6 导致 `127.0.0.1` 不可达的问题。
-    - 启动后自动 Self-Test：通过 `EditorApplication.delayCall` + `ThreadPool` 异步请求两个地址的 `/health` 端点，结果输出到 Console，帮助用户快速定位连接问题。
-    - `SceneScreenshot` 自动补全文件扩展名：当 `filename` 参数不含扩展名时自动追加 `.png`，确保截图文件可被 Unity 正常识别和预览。
+6.  **Dual IPv4/IPv6 binding & startup self-test** [v1.5.1]:
+    - `HttpListener` binds both `http://localhost:{port}/` and `http://127.0.0.1:{port}/`, resolving issues on some Windows systems where `localhost` only resolves to IPv6 and `127.0.0.1` becomes unreachable.
+    - After startup, an automatic self-test asynchronously requests the `/health` endpoint on both addresses via `EditorApplication.delayCall` + `ThreadPool`, then prints the results to the Console to help users quickly diagnose connection issues.
+    - `SceneScreenshot` now auto-appends a file extension: when the `filename` parameter has no extension, it automatically adds `.png` so Unity can correctly recognize and preview the screenshot.
 
-7.  **Domain Reload 韧性增强** [v1.6.2]:
-    - **重启意图保留**：`OnBeforeAssemblyReload` 仅在服务器正在运行时写入 `PREF_SERVER_SHOULD_RUN=true`，避免失败状态覆盖重启意图导致服务器永久死亡。
-    - **跨 Reload 连续失败追踪**：通过 `PREF_CONSECUTIVE_FAILURES` 计数器追踪连续失败次数，达到 5 次上限后放弃自动重启并提示用户手动操作。
-    - **Watchdog Keep-Alive 监控**：Watchdog 除监控 Listener 线程外，新增 Keep-Alive 线程存活检测，发现死亡后自动重启。
-    - **增强错误响应**：504 超时和 503 编译中响应包含 `diagnostics`（线程状态/队列深度/Domain Reload 状态）、`suggestion`、`manualAction`、`retryAfterSeconds`。
-    - **`/health` 结构化诊断**：新增 `threads`（listener/keepAlive 存活状态）、`compilation`（isCompiling/isUpdating/domainReloadPending）、`queueStats`（排队数/总请求数）字段。
-    - **SkillRouter 集中注入 `serverAvailability`**：编译进行中时，`SerializeSuccessResponse()` 自动向 Skill 返回结果注入 `serverAvailability` 提示，告知客户端服务器即将短暂不可达。
+7.  **Improved Domain Reload resilience** [v1.6.2]:
+    - **Restart intent is preserved**: `OnBeforeAssemblyReload` writes `PREF_SERVER_SHOULD_RUN=true` only when the server is actually running, preventing failed states from overwriting the restart intent and leaving the server permanently dead.
+    - **Cross-reload consecutive failure tracking**: a `PREF_CONSECUTIVE_FAILURES` counter tracks consecutive failures. After 5 failed restart cycles, auto-restart stops and the user is prompted to intervene manually.
+    - **Watchdog keep-alive monitoring**: in addition to monitoring the listener thread, the watchdog now checks whether the keep-alive thread is alive and restarts it automatically if it dies.
+    - **Enhanced error responses**: 504 timeout and 503 compiling responses include `diagnostics` (thread state / queue depth / Domain Reload state), `suggestion`, `manualAction`, and `retryAfterSeconds`.
+    - **Structured `/health` diagnostics**: new fields include `threads` (listener/keepAlive liveness), `compilation` (`isCompiling`/`isUpdating`/`domainReloadPending`), and `queueStats` (queued requests / total requests).
+    - **Centralized `serverAvailability` injection in `SkillRouter`**: while compilation is in progress, `SerializeSuccessResponse()` automatically injects a `serverAvailability` hint into skill responses so the client knows the server will become temporarily unavailable.
 
-**Producer-Consumer 模式** (线程安全)：
-- **Producer** (HTTP 线程)：接收 HTTP 请求，入队到 `RequestJob` 队列
-- **Consumer** (Unity 主线程)：通过 `EditorApplication.update` 处理队列中的任务
-- **自动恢复**：Domain Reload 后自动重启服务器（端口持久化 + 秒级延迟重试 + 端口 fallback + 连续失败追踪）
-- **超时可配置**：请求超时默认 15 分钟，用户可在设置面板自定义，Python 客户端自动同步
-- **超时值线程安全缓存**：`RequestTimeoutMs` 在 `Start()` 时缓存到静态字段，避免 ThreadPool 线程调用 `EditorPrefs`（主线程限定 API）导致 500 错误
-- **编译期短暂不可达属于预期**：脚本保存、强制重编译、Define 变更、资源重导入、包安装/移除等操作可能触发编译或 Domain Reload；此时 REST 服务短暂不可达是正常现象，客户端应等待后重试。错误响应（504/503）包含结构化诊断信息和重试建议
+**Producer-Consumer pattern** (thread-safe):
+- **Producer** (HTTP thread): receives HTTP requests and enqueues them into the `RequestJob` queue
+- **Consumer** (Unity main thread): processes queued tasks through `EditorApplication.update`
+- **Automatic recovery**: after Domain Reload, the server automatically restarts (port persistence + second-level delayed retry + port fallback + consecutive failure tracking)
+- **Configurable timeout**: request timeout defaults to 15 minutes, users can customize it in the settings panel, and the Python client syncs it automatically
+- **Thread-safe timeout cache**: `RequestTimeoutMs` is cached into a static field during `Start()` to avoid calling `EditorPrefs` from ThreadPool threads (a main-thread-only API), which would otherwise cause 500 errors
+- **Temporary unavailability during compilation is expected**: script saves, forced recompilation, define changes, asset reimports, package install/remove operations, and similar actions may trigger compilation or Domain Reload. Temporary REST unavailability during that time is normal, and clients should wait and retry. Error responses (504/503) include structured diagnostics and retry guidance
 
 ---
 
-## 📂 项目结构
+## 📂 Project Structure
 
 ```
 Unity-Skills/
-├── SkillsForUnity/                 # Unity 编辑器插件 (UPM Package)
+├── SkillsForUnity/                 # Unity Editor plugin (UPM Package)
 │   ├── package.json                # com.besty.unity-skills
-│   ├── unity-skills~/              # 跨平台 AI Skill 模板 (波浪线隐藏目录, 随包分发)
-│   │   ├── SKILL.md                # 主 Skill 定义 (AI 读取)
+│   ├── unity-skills~/              # Cross-platform AI Skill template (tilde-hidden directory, distributed with the package)
+│   │   ├── SKILL.md                # Main Skill definition (read by AI)
 │   │   ├── scripts/
-│   │   │   └── unity_skills.py     # Python 客户端库
-│   │   ├── skills/                 # 按模块分类的 Skill 文档（含 13 个 advisory 模块）
-│   │   └── references/             # Unity 开发参考文档
+│   │   │   └── unity_skills.py     # Python client library
+│   │   ├── skills/                 # Skill docs organized by module (including 13 advisory modules)
+│   │   └── references/             # Unity development reference docs
 │   └── Editor/
 │       └── Skills/
-│           ├── SkillsHttpServer.cs     # HTTP 服务器核心 (Producer-Consumer)
-│           ├── SkillRouter.cs          # 请求路由 & 反射发现 Skills
-│           ├── WorkflowManager.cs      # 持久化工作流核心 (Task/Session)
-│           ├── WorkflowModels.cs       # Snapshot/Task/Session 数据模型
-│           ├── RegistryService.cs      # 全局注册表 (多实例发现)
-│           ├── GameObjectFinder.cs     # 统一 GO 查找器 (name/instanceId/path)
-│           ├── UnitySkillAttribute.cs  # [UnitySkill] 特性定义
-│           ├── UnitySkillsWindow.cs    # 编辑器窗口 UI
-│           ├── SkillInstaller.cs       # AI 工具一键安装器
-│           ├── Localization.cs         # 中英双语 UI
+│           ├── SkillsHttpServer.cs     # HTTP server core (Producer-Consumer)
+│           ├── SkillRouter.cs          # Request routing & reflection-based skill discovery
+│           ├── WorkflowManager.cs      # Persistent workflow core (Task/Session)
+│           ├── WorkflowModels.cs       # Snapshot/Task/Session data models
+│           ├── RegistryService.cs      # Global registry (multi-instance discovery)
+│           ├── GameObjectFinder.cs     # Unified GO finder (name/instanceId/path)
+│           ├── UnitySkillAttribute.cs  # [UnitySkill] attribute definition
+│           ├── UnitySkillsWindow.cs    # Editor window UI
+│           ├── SkillInstaller.cs       # One-click installer for AI tools
+│           ├── Localization.cs         # Bilingual Chinese-English UI
 │           │
-│           ├── GameObjectSkills.cs     # GameObject 操作 (18 skills)
-│           ├── ComponentSkills.cs      # Component 操作 (10 skills)
-│           ├── SceneSkills.cs          # Scene 管理 (10 skills)
-│           ├── MaterialSkills.cs       # Material 操作 (21 skills)
+│           ├── GameObjectSkills.cs     # GameObject operations (18 skills)
+│           ├── ComponentSkills.cs      # Component operations (10 skills)
+│           ├── SceneSkills.cs          # Scene management (10 skills)
+│           ├── MaterialSkills.cs       # Material operations (21 skills)
 │           ├── CinemachineSkills.cs    # Cinemachine 3.x (23 skills)
-│           ├── WorkflowSkills.cs       # Workflow 撤销/回滚 (22 skills, 含 bookmark/history)
-│           ├── UISkills.cs             # UI 元素创建 (26 skills)
+│           ├── WorkflowSkills.cs       # Workflow undo/rollback (22 skills, including bookmark/history)
+│           ├── UISkills.cs             # UI element creation (26 skills)
 │           ├── UIToolkitSkills.cs      # UI Toolkit UXML/USS/UIDocument (25 skills)
-│           ├── AssetSkills.cs          # Asset 管理 (11 skills)
-│           ├── EditorSkills.cs         # Editor 控制 (12 skills)
-│           ├── AudioSkills.cs          # Audio 音频 (10 skills)
-│           ├── TextureSkills.cs        # Texture 纹理 (10 skills)
-│           ├── ModelSkills.cs          # Model 模型 (10 skills)
-│           ├── TimelineSkills.cs       # Timeline 时间线 (12 skills)
-│           ├── PhysicsSkills.cs        # Physics 物理 (12 skills)
-│           ├── ScriptSkills.cs         # Script 管理 (12 skills, 含 analyze)
-│           ├── AssetImportSkills.cs    # AssetImport 导入设置 (11 skills)
-│           ├── ProjectSkills.cs        # Project 项目设置 (11 skills)
-│           ├── ShaderSkills.cs         # Shader 操作 (11 skills)
-│           ├── CameraSkills.cs         # Camera 相机 (11 skills)
-│           ├── PackageSkills.cs        # Package 包管理 (11 skills)
-│           ├── TerrainSkills.cs        # Terrain 地形 (10 skills)
-│           ├── PrefabSkills.cs         # Prefab 操作 (10 skills)
-│           ├── AnimatorSkills.cs       # Animator 管理 (10 skills)
-│           ├── LightSkills.cs          # Light 配置 (10 skills)
-│           ├── ValidationSkills.cs     # 项目验证 (10 skills)
-│           ├── OptimizationSkills.cs   # 性能优化 (10 skills)
-│           ├── CleanerSkills.cs        # 项目清理 (10 skills)
-│           ├── NavMeshSkills.cs        # NavMesh 导航 (10 skills)
+│           ├── AssetSkills.cs          # Asset management (11 skills)
+│           ├── EditorSkills.cs         # Editor control (12 skills)
+│           ├── AudioSkills.cs          # Audio (10 skills)
+│           ├── TextureSkills.cs        # Texture (10 skills)
+│           ├── ModelSkills.cs          # Model (10 skills)
+│           ├── TimelineSkills.cs       # Timeline (12 skills)
+│           ├── PhysicsSkills.cs        # Physics (12 skills)
+│           ├── ScriptSkills.cs         # Script management (12 skills, including analyze)
+│           ├── AssetImportSkills.cs    # AssetImport import settings (11 skills)
+│           ├── ProjectSkills.cs        # Project settings (11 skills)
+│           ├── ShaderSkills.cs         # Shader operations (11 skills)
+│           ├── CameraSkills.cs         # Camera (11 skills)
+│           ├── PackageSkills.cs        # Package management (11 skills)
+│           ├── TerrainSkills.cs        # Terrain (10 skills)
+│           ├── PrefabSkills.cs         # Prefab operations (10 skills)
+│           ├── AnimatorSkills.cs       # Animator management (10 skills)
+│           ├── LightSkills.cs          # Light configuration (10 skills)
+│           ├── ValidationSkills.cs     # Project validation (10 skills)
+│           ├── OptimizationSkills.cs   # Performance optimization (10 skills)
+│           ├── CleanerSkills.cs        # Project cleanup (10 skills)
+│           ├── NavMeshSkills.cs        # NavMesh navigation (10 skills)
 │           ├── ScriptableObjectSkills.cs # ScriptableObject (10 skills)
-│           ├── ConsoleSkills.cs        # Console 控制台 (10 skills)
-│           ├── DebugSkills.cs          # Debug 调试 (10 skills)
-│           ├── EventSkills.cs          # Event 事件 (10 skills)
-│           ├── SmartSkills.cs          # AI 推理技能 (10 skills)
-│           ├── TestSkills.cs           # Test 测试 (10 skills)
-│           ├── ProfilerSkills.cs       # Profiler 性能分析 (10 skills)
-│           ├── PerceptionSkills.cs     # Perception 场景理解 (11 skills)
-│           ├── ProBuilderSkills.cs     # ProBuilder 建模 (22 skills, 需 com.unity.probuilder)
-│           ├── XRSkills.cs            # XR Interaction Toolkit (22 skills, 需 com.unity.xr.interaction.toolkit)
-│           ├── XRReflectionHelper.cs  # XR 反射辅助 (跨版本兼容 2.x/3.x)
-│           ├── SampleSkills.cs         # 基础示例 (8 skills)
-│           └── ... (40 个 *Skills.cs 文件, 共 512 Skills)
+│           ├── ConsoleSkills.cs        # Console control (10 skills)
+│           ├── DebugSkills.cs          # Debugging (10 skills)
+│           ├── EventSkills.cs          # Events (10 skills)
+│           ├── SmartSkills.cs          # AI reasoning skills (10 skills)
+│           ├── TestSkills.cs           # Testing (10 skills)
+│           ├── ProfilerSkills.cs       # Profiling (10 skills)
+│           ├── PerceptionSkills.cs     # Perception scene understanding (11 skills)
+│           ├── ProBuilderSkills.cs     # ProBuilder modeling (22 skills, requires com.unity.probuilder)
+│           ├── XRSkills.cs             # XR Interaction Toolkit (22 skills, requires com.unity.xr.interaction.toolkit)
+│           ├── XRReflectionHelper.cs   # XR reflection helper (cross-version compatibility for 2.x/3.x)
+│           ├── SampleSkills.cs         # Basic examples (8 skills)
+│           └── ... (40 `*Skills.cs` files, 512 Skills total)
 │
 ├── docs/
-│   └── SETUP_GUIDE.md              # 完整安装使用指南
-├── README.md                       # 项目说明
-├── CHANGELOG.md                    # 版本更新记录
-└── LICENSE                         # MIT 协议
+│   └── SETUP_GUIDE.md              # Complete setup and usage guide
+├── README.md                       # Project overview
+├── CHANGELOG.md                    # Version changelog
+└── LICENSE                         # MIT license
 ```
 
 ---
 
-## 🔧 核心组件详解
+## 🔧 Core Components Explained
 
 ### 1. SkillsHttpServer.cs
 
-HTTP 服务器核心，采用 **Producer-Consumer** 架构保证线程安全：
+The HTTP server core uses a **Producer-Consumer** architecture to ensure thread safety:
 
 ```csharp
-// 关键特性
-- 端口: localhost:8090
-- 自动恢复: Domain Reload 后通过 EditorPrefs 恢复状态，跨 Reload 连续失败追踪（5 次上限）
-- Keep-Alive: 后台线程定时触发 Unity 更新，确保后台运行
-- Watchdog: 监控 Listener + Keep-Alive 线程存活，自动重启死亡线程
-- 速率限制: 内置防止过快请求的保护机制
-- 请求超时: 用户可配置（默认 15 分钟），通过 /health 端点暴露给客户端自动同步
-- Domain Reload 韧性: 主动释放端口 + 端口持久化 + 秒级延迟重试 + 端口 fallback + 意图保留
-- /health 诊断: 返回 threads/compilation/queueStats 结构化状态，客户端可用于智能重试
-- 错误响应增强: 504/503 包含 diagnostics + suggestion + manualAction + retryAfterSeconds
+// Key features
+- Port: localhost:8090
+- Auto-recovery: restores state through EditorPrefs after Domain Reload, with cross-reload consecutive failure tracking (limit: 5)
+- Keep-Alive: a background thread periodically triggers Unity updates to keep the server running in the background
+- Watchdog: monitors both the Listener and Keep-Alive threads and automatically restarts dead threads
+- Rate limiting: built-in protection against requests that arrive too quickly
+- Request timeout: user-configurable (15 minutes by default), exposed through the /health endpoint for automatic client synchronization
+- Domain Reload resilience: proactive port release + port persistence + second-level delayed retries + port fallback + intent preservation
+- /health diagnostics: returns structured `threads` / `compilation` / `queueStats` state so the client can retry intelligently
+- Enhanced error responses: 504/503 include diagnostics + suggestion + manualAction + retryAfterSeconds
 ```
 
 ### 2. SkillRouter.cs
 
-反射发现所有标记 `[UnitySkill]` 的静态方法：
+Uses reflection to discover all static methods marked with `[UnitySkill]`:
 
 ```csharp
-// 核心方法
-Initialize()      // 扫描所有程序集，发现 [UnitySkill] 方法
-GetManifest()     // 返回所有 Skills 的 JSON 清单
-Execute(name, json) // 执行指定 Skill
-SerializeSuccessResponse(result) // 集中序列化，编译中自动注入 serverAvailability 提示
+// Core methods
+Initialize()      // Scans all assemblies and discovers [UnitySkill] methods
+GetManifest()     // Returns a JSON manifest of all Skills
+Execute(name, json) // Executes the specified Skill
+SerializeSuccessResponse(result) // Centralized serialization; auto-injects serverAvailability hints during compilation
 ```
 
 ### 3. UnitySkillAttribute.cs
 
-标记可被 REST API 调用的方法：
+Marks methods that can be called through the REST API:
 
 ```csharp
-[UnitySkill("skill_name", "描述信息")]
+[UnitySkill("skill_name", "Description")]
 public static object MySkill(string param1, float param2 = 0)
 {
-    // 实现逻辑
+    // Implementation logic
     return new { success = true, result = "..." };
 }
 ```
 
 ### 4. unity_skills.py
 
-Python 客户端封装：
+Python client wrapper:
 
 ```python
 import unity_skills
 
-# 核心 API
+# Core API
 unity_skills.call_skill("gameobject_create", name="Cube", primitiveType="Cube")
-unity_skills.health()      # 检查服务器状态
-unity_skills.get_skills()  # 获取所有可用 Skills
+unity_skills.health()      # Check server status
+unity_skills.get_skills()  # Get all available Skills
 
-# Auto-Workflow (v1.4+) - 自动记录可回滚的操作
-# 默认开启，所有修改操作自动创建 workflow task
-unity_skills.set_auto_workflow(True)  # 开启/关闭
+# Auto-Workflow (v1.4+) - automatically records rollback-capable operations
+# Enabled by default; all mutating operations automatically create workflow tasks
+unity_skills.set_auto_workflow(True)  # Enable/disable
 
-# Workflow Context - 多操作批量回滚
+# Workflow Context - batch rollback for multi-step operations
 with unity_skills.workflow_context('Build Scene', 'Create player and env'):
     unity_skills.call_skill('gameobject_create', name='Player')
     unity_skills.call_skill('component_add', name='Player', componentType='Rigidbody')
-# 所有操作可通过 workflow_undo_task 一次性回滚
+# All operations can be rolled back at once with workflow_undo_task
 
-# CLI 用法
+# CLI usage
 python unity_skills.py --list
 python unity_skills.py gameobject_create name=MyCube primitiveType=Cube
 ```
 
 ---
 
-## 🛡️ 代码质量保障 (v1.5.0 全项目审计)
+## 🛡️ Code Quality Assurance (v1.5.0 full-project audit)
 
-v1.5.0 对全部 38 个 C# 文件 + Python 客户端进行了完整审计，修复 36 项缺陷：
+v1.5.0 performed a complete audit across all 38 C# files plus the Python client, fixing 36 defects:
 
-### 安全防护
-- **ReDoS 防护**: 所有用户输入正则表达式添加 1 秒超时 (`ScriptSkills`, `GameObjectSkills`)
-- **路径注入防护**: skill name 校验拒绝 `/` `\` `..` 等路径字符 (`SkillsHttpServer`)
-- **空引用防护**: `PrefabSkills`/`SceneSkills`/`UISkills`/`CinemachineSkills`/`SmartSkills` 等 7 处 null 检查
-- **资源泄漏防护**: `LightSkills` 错误路径清理 GameObject；`SkillsHttpServer` Stop() 线程 Join
+### Security hardening
+- **ReDoS protection**: added a 1-second timeout to all user-input regular expressions (`ScriptSkills`, `GameObjectSkills`)
+- **Path injection protection**: skill name validation rejects path characters such as `/`, `\`, and `..` (`SkillsHttpServer`)
+- **Null-reference protection**: added null checks in 7 places including `PrefabSkills`, `SceneSkills`, `UISkills`, `CinemachineSkills`, and `SmartSkills`
+- **Resource leak protection**: `LightSkills` now cleans up GameObjects on failure paths; `SkillsHttpServer.Stop()` now joins threads
 
-### 数据完整性
-- **原子文件写入**: `WorkflowManager.SaveHistory()` 先写 `.tmp` 再原子替换，防止崩溃丢数据
-- **快照上限**: 单任务最多 500 条快照，防止批量操作内存溢出
-- **进程存活检查**: `RegistryService` 清理条目时验证进程是否存活，避免僵尸注册
-- **AnimatorSkills**: `controller.parameters` 数组副本修改后回写
+### Data integrity
+- **Atomic file writes**: `WorkflowManager.SaveHistory()` now writes to `.tmp` first and then replaces atomically to prevent data loss on crashes
+- **Snapshot limit**: each task is limited to 500 snapshots to prevent memory overflow during batch operations
+- **Process liveness checks**: `RegistryService` verifies whether a process is still alive when cleaning entries, preventing zombie registrations
+- **AnimatorSkills**: writes back the modified `controller.parameters` array copy after changes
 
-### 已知设计决策（非缺陷）
-- `WorkflowManager.SnapshotObject()` 内部已有 `_currentTask == null` 守卫，外部调用无需额外检查
-- `ManualResetEventSlim` 通过 ownership transfer 模式管理，WaitAndRespond finally 中 Dispose
-- `get_skills()`/`health()` 使用 `requests.get` 而非 Session 对象，属简单 GET 请求的设计选择
-- Base64 资源备份不限制文件大小，保证完整撤销/重做能力
-- `script_create` 同时接受 `scriptName` 和 `name` 参数（`scriptName` 优先），空值时返回错误而非生成无名文件
-- `light_add_probe_group` 支持 `gridX/gridY/gridZ` + `spacingX/spacingY/spacingZ` 参数，一步创建网格布局光照探针
+### Known design decisions (not defects)
+- `WorkflowManager.SnapshotObject()` already guards against `_currentTask == null`, so callers do not need an extra check
+- `ManualResetEventSlim` is managed through an ownership-transfer pattern and disposed in the `WaitAndRespond` finally block
+- `get_skills()` / `health()` intentionally use `requests.get` instead of the Session object because they are simple GET requests
+- Base64 asset backups do not limit file size so undo/redo remains fully reliable
+- `script_create` accepts both `scriptName` and `name` (`scriptName` takes precedence) and returns an error on empty input instead of creating an unnamed file
+- `light_add_probe_group` supports `gridX/gridY/gridZ` + `spacingX/spacingY/spacingZ` parameters to create a grid-layout light probe group in one step
 
-### Unity 6 兼容性修复 (v1.5.1)
+### Unity 6 compatibility fixes (v1.5.1)
 
-以下修复确保在 Unity 6 (6000.2.x) 上正常运行：
+The following fixes ensure normal operation on Unity 6 (6000.2.x):
 
-- **`console_set_collapse` / `console_set_clear_on_play`**: Unity 6 移除了 `ConsoleWindow.s_ConsoleFlags`，改为多级回退策略
-- **`cinemachine_set_active`**: CM3 的 `Priority` 属性不支持 LINQ `Max()` 泛型比较，改用手动迭代
-- **`audio_create_mixer`**: `ScriptableObject.CreateInstance(AudioMixerController)` 触发 `ExtensionOfNativeClass` 异常，改用 `CreateMixerControllerAtPath` 工厂方法。注："Mixer is not initialized" 日志为 Unity 6 内部已知问题，不影响功能
-- **`event_add_listener`**: `GetComponent("GameObject")` 返回 null，新增特殊处理
-- **`component_set_enabled`**: 新增 `Renderer` 和 `Collider` 类型支持（它们不继承 `Behaviour`）
-- **`optimize_find_duplicate_materials`**: `mat.color` 访问不存在的 `_Color` 属性时异常，改为 `HasProperty` 安全检查
-- **Splines 版本适配**: Unity 6 自动使用 Splines 2.8.3，Unity 2022 使用 2.8.0
+- **`console_set_collapse` / `console_set_clear_on_play`**: Unity 6 removed `ConsoleWindow.s_ConsoleFlags`, so the implementation now uses a multi-level fallback strategy
+- **`cinemachine_set_active`**: CM3's `Priority` property does not support generic LINQ `Max()` comparisons, so the code now uses manual iteration instead
+- **`audio_create_mixer`**: `ScriptableObject.CreateInstance(AudioMixerController)` triggers an `ExtensionOfNativeClass` exception, so it now uses the `CreateMixerControllerAtPath` factory method instead. Note: the "Mixer is not initialized" log is a known internal Unity 6 issue and does not affect functionality
+- **`event_add_listener`**: `GetComponent("GameObject")` returns null, so special-case handling was added
+- **`component_set_enabled`**: added support for `Renderer` and `Collider` types (they do not inherit from `Behaviour`)
+- **`optimize_find_duplicate_materials`**: accessing `mat.color` throws when `_Color` does not exist, so it now uses a safe `HasProperty` check
+- **Splines version adaptation**: Unity 6 now uses Splines 2.8.3 automatically, while Unity 2022 uses 2.8.0
 
 ---
 
-## 📊 Skills 模块汇总 (512)
+## 📊 Skills Module Summary (512)
 
-| 模块 | Skills 数量 | 核心功能 |
+| Module | Skill Count | Core Functions |
 |------|:-----------:|----------|
-| **Cinemachine** | 23 | 2.x/3.x双版本支持/自动安装/混合相机/ClearShot/TargetGroup/Spline |
-| **Workflow** | 22 | 持久化历史/任务快照/会话级撤销/回滚/书签 |
-| **Material** | 21 | 材质属性批量修改/HDR/PBR/Emission/关键字/渲染队列 |
-| **GameObject** | 18 | 创建/查找/变换同步/批量操作/层级管理/重命名/复制 |
-| **Scene** | 10 | 多场景加载/卸载/激活/截图/上下文/依赖分析/报告导出 |
-| **UI System** | 26 | Canvas/Button/Text/Slider/Toggle/Dropdown/ScrollView/RawImage/CanvasGroup/Mask/Outline/Selectable配置/锚点/布局/对齐/分布 |
-| **UI Toolkit** | 25 | UXML/USS文件管理/UXML元素增删改/USS规则操作/UIDocument/PanelSettings/模板生成(10种)/EditorWindow脚手架/运行时UI脚手架/层级检查 |
-| **Asset** | 11 | 资产导入/删除/移动/复制/搜索/文件夹/批量操作/刷新 |
-| **Editor** | 12 | 播放模式/选择/撤销重做/上下文获取/菜单执行 |
-| **Timeline** | 12 | 轨道创建/删除/Clip管理/播放控制/绑定/时长设置 |
-| **Physics** | 12 | 射线检测/球形投射/盒形投射/物理材质/层碰撞矩阵 |
-| **Audio** | 10 | 音频导入设置/AudioSource/AudioClip/AudioMixer/批量 |
-| **Texture** | 10 | 纹理导入设置/平台设置/Sprite/类型/尺寸查找/批量 |
-| **Model** | 10 | 模型导入设置/Mesh信息/材质映射/动画/骨骼/批量 |
-| **Script** | 12 | C#脚本创建/读取/替换/列表/信息/重命名/移动/分析 |
-| **Package** | 11 | 包管理/安装/移除/搜索/版本/依赖/Cinemachine/Splines |
-| **AssetImport** | 11 | 纹理/模型/音频/Sprite导入设置/标签管理/重导入 |
-| **Project** | 11 | 渲染管线/构建设置/包管理/Layer/Tag/PlayerSettings/质量 |
-| **Shader** | 11 | Shader创建/URP模板/编译检查/关键字/变体分析/全局关键字 |
-| **Camera** | 11 | Scene View控制/Game Camera创建/属性/截图/正交切换/列表 |
-| **Terrain** | 10 | 地形创建/高度图/Perlin噪声/平滑/平坦化/纹理绘制 |
-| **NavMesh** | 10 | 烘焙/路径计算/Agent/Obstacle/采样/区域代价 |
-| **Cleaner** | 10 | 未使用资源/重复文件/空文件夹/丢失脚本修复/依赖树 |
-| **ScriptableObject** | 10 | 创建/读写/批量设置/删除/查找/JSON导入导出 |
-| **Console** | 10 | 日志捕获/清理/导出/统计/暂停控制/折叠/播放清除 |
-| **Debug** | 10 | 错误日志/编译检查/堆栈/程序集/定义符号/内存信息 |
-| **Event** | 10 | UnityEvent监听器管理/批量添加/复制/状态控制/列举 |
-| **Smart** | 10 | 场景SQL查询/空间查询/自动布局/对齐地面/网格吸附/随机化/替换 |
-| **Test** | 10 | 测试运行/按名运行/分类/模板创建/汇总统计 |
-| **Prefab** | 10 | 创建/实例化/覆盖应用与恢复/批量实例化/变体/查找实例 |
-| **Component** | 10 | 添加/移除/属性配置/批量操作/复制/启用禁用 |
-| **Optimization** | 10 | 纹理压缩/网格压缩/音频压缩/场景分析/静态标记/LOD/重复材质/过度绘制 |
-| **Profiler** | 10 | FPS/内存/纹理/网格/材质/音频/渲染统计/对象计数/AssetBundle |
-| **Light** | 10 | 灯光创建/类型配置/强度颜色/批量开关/探针组/反射探针/光照贴图 |
-| **Validation** | 10 | 项目验证/空文件夹清理/引用检测/网格碰撞/Shader错误 |
-| **Animator** | 10 | 动画控制器/参数/状态机/过渡/分配/播放 |
-| **Perception** | 11 | 场景摘要/层级树/脚本分析/空间查询/材质概览/场景快照/依赖分析/报告导出/性能提示/脚本依赖图 |
-| **ProBuilder** | 22 | 形状创建/面拉伸/细分/倒角/面删除/面合并/面材质/法线翻转/网格信息/枢轴设置/批量创建/顶点移动/顶点设置/顶点查询/网格合并/整体材质/面分离/边拉伸/边桥接/法线统一/顶点焊接/UV投射（需 com.unity.probuilder） |
-| **XR** | 22 | XR项目验证/XR Origin Rig创建/InteractionManager/EventSystem/场景诊断/RayInteractor/DirectInteractor/SocketInteractor/GrabInteractable/SimpleInteractable/交互配置/传送系统/TeleportArea/TeleportAnchor/连续移动/转向提供者/XR UI Canvas/触觉反馈/交互事件/交互层（需 com.unity.xr.interaction.toolkit，反射兼容2.x/3.x） |
-| **Sample** | 8 | 基础示例：创建/删除/变换/场景信息 |
+| **Cinemachine** | 23 | 2.x/3.x dual-version support / auto-install / MixingCamera / ClearShot / TargetGroup / Spline |
+| **Workflow** | 22 | Persistent history / task snapshots / session-level undo / rollback / bookmarks |
+| **Material** | 21 | Batch material property edits / HDR / PBR / Emission / keywords / render queue |
+| **GameObject** | 18 | Create / find / transform sync / batch operations / hierarchy management / rename / duplicate |
+| **Scene** | 10 | Multi-scene load / unload / activate / screenshots / context / dependency analysis / report export |
+| **UI System** | 26 | Canvas / Button / Text / Slider / Toggle / Dropdown / ScrollView / RawImage / CanvasGroup / Mask / Outline / Selectable configuration / anchors / layout / alignment / distribution |
+| **UI Toolkit** | 25 | UXML/USS file management / UXML element add-remove-edit / USS rule operations / UIDocument / PanelSettings / template generation (10 kinds) / EditorWindow scaffolding / runtime UI scaffolding / hierarchy inspection |
+| **Asset** | 11 | Asset import / delete / move / copy / search / folders / batch operations / refresh |
+| **Editor** | 12 | Play mode / selection / undo-redo / context retrieval / menu execution |
+| **Timeline** | 12 | Track creation / deletion / clip management / playback control / binding / duration settings |
+| **Physics** | 12 | Raycasts / sphere casts / box casts / physics materials / layer collision matrix |
+| **Audio** | 10 | Audio import settings / AudioSource / AudioClip / AudioMixer / batch |
+| **Texture** | 10 | Texture import settings / platform settings / Sprite / type / size lookup / batch |
+| **Model** | 10 | Model import settings / mesh info / material mapping / animation / skeleton / batch |
+| **Script** | 12 | C# script create / read / replace / list / info / rename / move / analyze |
+| **Package** | 11 | Package management / install / remove / search / versions / dependencies / Cinemachine / Splines |
+| **AssetImport** | 11 | Texture / model / audio / Sprite import settings / label management / reimport |
+| **Project** | 11 | Render pipeline / build settings / package management / Layer / Tag / PlayerSettings / quality |
+| **Shader** | 11 | Shader creation / URP templates / compile checks / keywords / variant analysis / global keywords |
+| **Camera** | 11 | Scene View control / Game Camera creation / properties / screenshots / orthographic toggle / list |
+| **Terrain** | 10 | Terrain creation / heightmaps / Perlin noise / smoothing / flattening / texture painting |
+| **NavMesh** | 10 | Baking / path calculation / Agent / Obstacle / sampling / area cost |
+| **Cleaner** | 10 | Unused assets / duplicate files / empty folders / missing script repair / dependency tree |
+| **ScriptableObject** | 10 | Create / read-write / batch set / delete / find / JSON import-export |
+| **Console** | 10 | Log capture / clear / export / statistics / pause control / collapse / clear on play |
+| **Debug** | 10 | Error logs / compile checks / stack traces / assemblies / define symbols / memory info |
+| **Event** | 10 | UnityEvent listener management / batch add / copy / state control / listing |
+| **Smart** | 10 | Scene SQL queries / spatial queries / auto layout / align to ground / grid snap / randomize / replace |
+| **Test** | 10 | Test runs / run by name / categories / template creation / summary statistics |
+| **Prefab** | 10 | Create / instantiate / apply and revert overrides / batch instantiate / variants / find instances |
+| **Component** | 10 | Add / remove / property configuration / batch operations / copy / enable-disable |
+| **Optimization** | 10 | Texture compression / mesh compression / audio compression / scene analysis / static flags / LOD / duplicate materials / overdraw |
+| **Profiler** | 10 | FPS / memory / texture / mesh / material / audio / rendering stats / object count / AssetBundle |
+| **Light** | 10 | Light creation / type configuration / intensity and color / batch toggles / probe groups / reflection probes / lightmaps |
+| **Validation** | 10 | Project validation / empty folder cleanup / reference checks / mesh collider / Shader errors |
+| **Animator** | 10 | Animation controller / parameters / state machine / transitions / assignment / playback |
+| **Perception** | 11 | Scene summary / hierarchy tree / script analysis / spatial queries / material overview / scene snapshots / dependency analysis / report export / performance hints / script dependency graph |
+| **ProBuilder** | 22 | Shape creation / face extrusion / subdivision / bevel / face deletion / face merge / face materials / normal flipping / mesh info / pivot setup / batch creation / vertex movement / vertex setup / vertex queries / mesh merge / overall materials / face separation / edge extrusion / edge bridging / normal unification / vertex welding / UV projection (requires com.unity.probuilder) |
+| **XR** | 22 | XR project validation / XR Origin Rig creation / InteractionManager / EventSystem / scene diagnostics / RayInteractor / DirectInteractor / SocketInteractor / GrabInteractable / SimpleInteractable / interaction configuration / teleport system / TeleportArea / TeleportAnchor / continuous movement / turn provider / XR UI Canvas / haptics / interaction events / interaction layers (requires com.unity.xr.interaction.toolkit, reflection-compatible with 2.x/3.x) |
+| **Sample** | 8 | Basic examples: create / delete / transform / scene info |
 
-> ⚠️ **重要提示**：大部分模块都支持 `*_batch` 批量操作，操作多个物体时应优先使用批量 Skills。
+> ⚠️ **Important**: Most modules support `*_batch` batch operations. When working with multiple objects, prioritize batch Skills.
 
 ---
 
-## 🚀 快速使用
+## 🚀 Quick Usage
 
-### 启动服务器
+### Start the server
 
-1. Unity 菜单: `Window > UnitySkills > Start Server`
-2. Console 显示: `[UnitySkills] REST Server started at http://localhost:8090/`
+1. Unity menu: `Window > UnitySkills > Start Server`
+2. The Console shows: `[UnitySkills] REST Server started at http://localhost:8090/`
 
-### AI 调用示例
+### AI invocation example
 
 ```python
 import unity_skills
 
-# 创建红色立方体
+# Create a red cube
 unity_skills.call_skill("gameobject_create", 
     name="RedCube", primitiveType="Cube", x=0, y=1, z=0)
 unity_skills.call_skill("material_set_color", 
     name="RedCube", r=1, g=0, b=0)
 
-# 添加物理组件
+# Add a physics component
 unity_skills.call_skill("component_add", 
     name="RedCube", componentType="Rigidbody")
 
-# 保存场景
+# Save the scene
 unity_skills.call_skill("scene_save", scenePath="Assets/Scenes/Demo.unity")
 ```
 
-### HTTP 直接调用
+### Direct HTTP invocation
 
 ```bash
-# 获取所有 Skills
+# Get all Skills
 curl http://localhost:8090/skills
 
-# 创建物体
+# Create an object
 curl -X POST http://localhost:8090/skill/gameobject_create \
   -H "Content-Type: application/json" \
   -d '{"name":"MyCube","primitiveType":"Cube","x":1,"y":2,"z":3}'
@@ -373,28 +374,28 @@ curl -X POST http://localhost:8090/skill/gameobject_create \
 
 ---
 
-## ⚠️ 重要注意事项
+## ⚠️ Important Notes
 
 ### 1. Domain Reload
 
-创建 C# 脚本时，Unity 会触发 Domain Reload：
+When creating a C# script, Unity triggers Domain Reload:
 
 ```python
 result = unity_skills.call_skill('script_create', name='MyScript', template='MonoBehaviour')
 if result.get('success'):
-    # 等待 Unity 重新编译完成
-    time.sleep(5)  # 或使用 wait_for_unity()
+    # Wait for Unity to finish recompiling
+    time.sleep(5)  # or use wait_for_unity()
 ```
 
-### 2. 线程安全
+### 2. Thread safety
 
-- 所有 Unity API 调用仅在主线程执行
-- HTTP 请求线程仅负责入队/出队
-- 使用 `EditorApplication.update` 消费任务队列
+- All Unity API calls execute only on the main thread
+- The HTTP request thread is only responsible for enqueueing/dequeueing
+- `EditorApplication.update` is used to consume the task queue
 
-### 3. 响应格式
+### 3. Response format
 
-所有 Skills 返回统一格式：
+All Skills return a unified format:
 
 ```json
 {
@@ -411,105 +412,105 @@ if result.get('success'):
 
 ---
 
-## 🤖 支持的 AI 终端
+## 🤖 Supported AI Terminals
 
-| 终端 | 支持状态 | 特色 |
+| Terminal | Support Status | Highlights |
 |------|:--------:|------|
-| **Antigravity** | ✅ | 支持 `/unity-skills` 斜杠命令 |
-| **Claude Code** | ✅ | 智能识别 Skill 意图 |
-| **Gemini CLI** | ✅ | 实验性 `experimental.skills` 支持 |
-| **Codex** | ✅ | 支持 `$skill` 显式调用和隐式识别 |
+| **Antigravity** | ✅ | Supports the `/unity-skills` slash command |
+| **Claude Code** | ✅ | Intelligently recognizes Skill intent |
+| **Gemini CLI** | ✅ | Experimental `experimental.skills` support |
+| **Codex** | ✅ | Supports both explicit `$skill` invocation and implicit recognition |
 
 ---
 
-## 📦 安装方式
+## 📦 Installation Methods
 
-### Unity 插件安装
+### Unity plugin installation
 
 ```
 Window → Package Manager → + → Add package from git URL
 https://github.com/Besty0728/Unity-Skills.git?path=/SkillsForUnity
 ```
 
-### AI Skills 配置
+### AI Skills configuration
 
-使用 Unity 编辑器一键安装：
-1. `Window > UnitySkills` 打开窗口
-2. 切换到 **AI Config** 标签页
-3. 选择目标 AI 工具 (Claude / Antigravity / Gemini)
-4. 点击 **Install** 完成配置
+Use the Unity Editor one-click installer:
+1. Open the window from `Window > UnitySkills`
+2. Switch to the **AI Config** tab
+3. Select the target AI tool (Claude / Antigravity / Gemini)
+4. Click **Install** to finish configuration
 
 ---
 
-## 🔍 扩展开发
+## 🔍 Extension Development
 
-### 自定义 Skill
+### Custom Skill
 
 ```csharp
 using UnitySkills;
 
 public static class MyCustomSkills
 {
-    [UnitySkill("my_custom_skill", "自定义操作描述")]
+    [UnitySkill("my_custom_skill", "Custom operation description")]
     public static object MyCustomSkill(string param1, float param2 = 0)
     {
-        // 你的逻辑
-        return new { success = true, message = "操作完成" };
+        // Your logic
+        return new { success = true, message = "Operation completed" };
     }
 }
 ```
 
-重启 REST 服务器后自动发现新 Skill。
+After restarting the REST server, the new Skill is discovered automatically.
 
 ---
 
-## 📚 参考资源
+## 📚 Reference Resources
 
-| 文件 | 用途 |
+| File | Purpose |
 |------|------|
-| [SKILL.md](SkillsForUnity/unity-skills~/SKILL.md) | 完整 Skill API 参考 |
-| [SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | 详细安装使用指南 |
-| [CHANGELOG.md](CHANGELOG.md) | 版本更新记录 |
-| [references/](SkillsForUnity/unity-skills~/references/) | Unity 开发参考文档 |
+| [SKILL.md](SkillsForUnity/unity-skills~/SKILL.md) | Complete Skill API reference |
+| [SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | Detailed setup and usage guide |
+| [CHANGELOG.md](CHANGELOG.md) | Version changelog |
+| [references/](SkillsForUnity/unity-skills~/references/) | Unity development reference docs |
 
 ---
 
-## 📌 版本号更新规范
+## 📌 Version Number Update Rules
 
-> ⚠️ **重要规则**：当前版本号维护采用“统一常量 + 派生位点”模式。每次发布新版本时，必须同步检查以下 **10 处**：
+> ⚠️ **Important rule**: The current versioning workflow uses a "single source of truth + derived touchpoints" model. Each time a new version is released, you must synchronously check these **10 locations**:
 
-| 序号 | 文件路径 | 位置 |
+| No. | File Path | Location |
 |:----:|----------|------|
-| 1 | `SkillsForUnity/Editor/Skills/SkillsLogger.cs` | `public const string Version = "x.x.x"`，这是 C# 端统一版本源 |
-| 2 | `agent.md` | 顶部概览表格中的 `\| **版本** \|` 等关键信息 |
+| 1 | `SkillsForUnity/Editor/Skills/SkillsLogger.cs` | `public const string Version = "x.x.x"`, this is the unified C# version source |
+| 2 | `agent.md` | Key information such as the `\| **Version** \|` row in the top overview table |
 | 3 | `SkillsForUnity/package.json` | `"version": "x.x.x"` |
-| 4 | `CHANGELOG.md` | 顶部新增 `## [x.x.x] - YYYY-MM-DD` 条目 |
+| 4 | `CHANGELOG.md` | Add a new top entry: `## [x.x.x] - YYYY-MM-DD` |
 | 5 | `SkillsForUnity/unity-skills~/scripts/unity_skills.py` | `__version__ = "x.x.x"` |
-| 6 | `README.md` | Git URL 示例、技能数、Unity 基线、超时与安装说明 |
-| 7 | `README_EN.md` | Git URL 示例、技能数、Unity 基线、超时与安装说明 |
-| 8 | `docs/SETUP_GUIDE.md` | 安装、超时、目录结构与使用说明 |
-| 9 | `SkillsForUnity/unity-skills~/SKILL.md` | 根 Skill 快照、说明与路由提示 |
-| 10 | `SkillsForUnity/unity-skills~/skills/SKILL.md` | 模块索引、覆盖范围与 advisory 说明 |
+| 6 | `README.md` | Git URL examples, skill counts, Unity baseline, timeout, and installation instructions |
+| 7 | `README_EN.md` | Git URL examples, skill counts, Unity baseline, timeout, and installation instructions |
+| 8 | `docs/SETUP_GUIDE.md` | Setup, timeout, directory structure, and usage instructions |
+| 9 | `SkillsForUnity/unity-skills~/SKILL.md` | Root Skill snapshot, explanations, and routing hints |
+| 10 | `SkillsForUnity/unity-skills~/skills/SKILL.md` | Module index, coverage, and advisory notes |
 
-### 额外约束
+### Additional constraints
 
-- `SkillsHttpServer.cs` / `SkillRouter.cs` 必须继续使用 `SkillsLogger.Version`，不要重新写死字面量。
-- 如果 Unity 维护基线、技能总数、advisory 模块数、默认超时或安装结构发生变化，`.github` 下相关文档与模板也要同步更新。
+- `SkillsHttpServer.cs` / `SkillRouter.cs` must continue using `SkillsLogger.Version`; do not hardcode literal versions again.
+- If the Unity maintenance baseline, total skill count, advisory module count, default timeout, or installation structure changes, related documents and templates under `.github` must also be updated.
 
-### 快速检查命令
+### Quick validation command
 
 ```bash
-# 检查统一版本源与主要文档是否一致
-rg -n "1\.6\.3|2022\.3\+|490|15 分钟|15 minutes|SkillsLogger.Version|__version__" agent.md CHANGELOG.md README.md README_EN.md docs/SETUP_GUIDE.md SkillsForUnity/unity-skills~/SKILL.md SkillsForUnity/unity-skills~/skills/SKILL.md SkillsForUnity/package.json SkillsForUnity/unity-skills~/scripts/unity_skills.py SkillsForUnity/Editor/Skills/SkillsLogger.cs
+# Check whether the unified version source matches the main docs
+rg -n "1\.6\.3|2022\.3\+|490|15 minutes|15 minutes|SkillsLogger.Version|__version__" agent.md CHANGELOG.md README.md README_EN.md docs/SETUP_GUIDE.md SkillsForUnity/unity-skills~/SKILL.md SkillsForUnity/unity-skills~/skills/SKILL.md SkillsForUnity/package.json SkillsForUnity/unity-skills~/scripts/unity_skills.py SkillsForUnity/Editor/Skills/SkillsLogger.cs
 ```
 
 ---
 
-## 🔀 Git 分支规则
+## 🔀 Git Branch Rules
 
-> ⚠️ **重要规则**：main 和 beta 分支必须保持线性同步，不使用 merge commit。
+> ⚠️ **Important rule**: The `main` and `beta` branches must remain linearly synchronized, without merge commits.
 
-### 同步方式
+### Synchronization method
 
 ```bash
 git checkout main
@@ -517,11 +518,11 @@ git reset --hard beta
 git push origin main --force
 ```
 
-### 规则说明
+### Rule details
 
-- **开发过程中**：只在 beta 分支操作，提交到 beta
-- **开发完成后**：将 beta 同步到 main，保持双分支一致
-- main 和 beta 保持相同的提交历史（线性）
-- 不使用 merge commit，使用 `git reset --hard` 让分支指向同一提交
-- 每次提交独立显示，最大化 GitHub 贡献记录
-- 同步后使用 `git push --force` 更新远程
+- **During development**: work only on the `beta` branch and commit to `beta`
+- **After development is complete**: sync `beta` to `main` to keep both branches consistent
+- `main` and `beta` must keep the same commit history (linear history)
+- Do not use merge commits; use `git reset --hard` so both branches point to the same commit
+- Each commit should appear independently to maximize the GitHub contribution record
+- After syncing, use `git push --force` to update the remote
